@@ -32,7 +32,7 @@ method parameters
  - The third argument is a string option defining some general configuration for the TMVA session. For example all TMVA output can be suppressed by removing the "!" (not) in front of the "Silent" argument in the option string
  '''
 
- def TMVA_Higgs_Classification():
+def TMVA_Higgs_Classification():
 #  options to control used methods
 
    useLikelihood = true       #likelihood based discriminant
@@ -42,7 +42,7 @@ method parameters
    useBDT = true              #BOosted Decision Tree
    useDL = true               #TMVA Deep learning ( CPU or GPU)
 
- TMVA.Tools.Instance()
+TMVA.Tools.Instance()
 
  '''
 ## Setup Dataset(s)
@@ -56,21 +56,21 @@ inputFileLink = ROOT.TString("http://root.cern.ch/files/" + inputFileName)
 
 inputFile = ROOT.TFile(nullptr)
 
-if (gSystem.AccessPathName(inputFileName)!=nullptr) {
+if (gSystem.AccessPathName(inputFileName)!=nullptr):
       # file exists
-      inputFile = ROOT.TFile.Open( inputFileName );
-   }
+      inputFile = ROOT.TFile.Open( inputFileName )
+   
 
-   if (inputFile == nullptr) {
+   if (inputFile == nullptr): 
       # download file from Cernbox location
-      ROOT.Info("TMVA_Higgs_Classification","Download Higgs_data.root file");
+      ROOT.Info("TMVA_Higgs_Classification","Download Higgs_data.root file")
       ROOT.TFile.SetCacheFileDir(".")
-      inputFile = ROOT.TFile.Open(inputFileLink, "CACHEREAD");
-      if (inputFile == nullptr) {
+      inputFile = ROOT.TFile.Open(inputFileLink, "CACHEREAD")
+      if (inputFile == nullptr):
          Error("TMVA_Higgs_Classification","Input file cannot be downloaded - exit");
          return
-      }
-   }
+      
+   
 
 # --- Register the training and test trees
 
@@ -233,7 +233,7 @@ We can then book the DL method using the built option string
    if (useDL):
 
       useDLGPU = false
-if __debug__: R__HAS_TMVAGPU
+   if __debug__: R__HAS_TMVAGPU
       useDLGPU = true
 
       # Define DNN layout
@@ -269,16 +269,16 @@ if __debug__: R__HAS_TMVAGPU
       dnnOptions.Append (trainingStrategyString)
 
       dnnMethodName = ROOT.TString("DNN_CPU")
-      if (useDLGPU) {
+      if (useDLGPU):
          dnnOptions += ":Architecture=GPU"
          dnnMethodName = "DNN_GPU"
-      } else  {
+      else:
          dnnOptions += ":Architecture=CPU"
-      }
+      
 
       factory.BookMethod(loader, TMVA::Types::kDL, dnnMethodName, dnnOptions)
 
-   }
+   
 
    '''
 ## Train Methods
@@ -308,6 +308,3 @@ Here we train all the previously booked methods.
 ## to display additional plots
 
    outputFile.Close()
-
-
-}
