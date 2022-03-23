@@ -13,8 +13,9 @@
 ## /
 ## / \author Lorenzo Moneta
 
-import TMVA
+
 import ROOT
+from ROOT import TMVA 
 '''
 ## Declare Factory
 
@@ -42,51 +43,49 @@ def TMVA_Higgs_Classification():
    useBDT = true              #BOosted Decision Tree
    useDL = true               #TMVA Deep learning ( CPU or GPU)
 
-TMVA.Tools.Instance()
+   TMVA.Tools.Instance()
 
- '''
-## Setup Dataset(s)
+   '''
+   ## Setup Dataset(s)
 
-Define now input data file and signal and background trees
+   Define now input data file and signal and background trees
 
- '''
+   '''
 
-inputFileName = ROOT.TString("Higgs_data.root")
-inputFileLink = ROOT.TString("http://root.cern.ch/files/" + inputFileName)
+   inputFileName = ROOT.TString("Higgs_data.root")
+   inputFileLink = ROOT.TString("http://root.cern.ch/files/" + inputFileName)
 
-inputFile = ROOT.TFile(nullptr)
+   inputFile = ROOT.TFile(nullptr)
 
-if (gSystem.AccessPathName(inputFileName)!=nullptr):
+   if (gSystem.AccessPathName(inputFileName)!=nullptr):
       # file exists
       inputFile = ROOT.TFile.Open( inputFileName )
-   
-
-   if (inputFile == nullptr): 
-      # download file from Cernbox location
-      ROOT.Info("TMVA_Higgs_Classification","Download Higgs_data.root file")
-      ROOT.TFile.SetCacheFileDir(".")
-      inputFile = ROOT.TFile.Open(inputFileLink, "CACHEREAD")
-      if (inputFile == nullptr):
-         Error("TMVA_Higgs_Classification","Input file cannot be downloaded - exit");
-         return
+      if(inputFile == nullptr): 
+         # download file from Cernbox location
+         ROOT.Info("TMVA_Higgs_Classification","Download Higgs_data.root file")
+         ROOT.TFile.SetCacheFileDir(".")
+         inputFile = ROOT.TFile.Open(inputFileLink, "CACHEREAD")
+         if (inputFile == nullptr):
+            Error("TMVA_Higgs_Classification","Input file cannot be downloaded - exit");
+            return
       
    
 
 # --- Register the training and test trees
 
-  signalTree = ROOT.TTree(inputFile.Get("sig_tree"))
-  backgroundTree = ROOT.TTree(inputFile.Get("bkg_tree"))
+   signalTree = ROOT.TTree(inputFile.Get("sig_tree"))
+   backgroundTree = ROOT.TTree(inputFile.Get("bkg_tree"))
 
-  signalTree.Print()
+   signalTree.Print()
 
-'''
-## Declare DataLoader(s)
+   '''
+   ## Declare DataLoader(s)
 
-The next step is to declare the DataLoader class that deals with input variables
+   The next step is to declare the DataLoader class that deals with input variables
 
-Define the input variables that shall be used for the MVA training
-note that you may also use variable expressions, which can be parsed by TTree::Draw( "expression" )]
-'''
+   Define the input variables that shall be used for the MVA training
+   note that you may also use variable expressions, which can be parsed by TTree::Draw( "expression" )]
+   '''
 
    loader = TMVA.DataLoader("dataset")
 
@@ -101,8 +100,8 @@ note that you may also use variable expressions, which can be parsed by TTree::D
 ### We set now the input data trees in the TMVA DataLoader class
 
 # global event weights per tree (see below for setting event-wise weights)
-    signalWeight = 1.0
-    backgroundWeight = 1.0
+   signalWeight = 1.0
+   backgroundWeight = 1.0
 
 #  You can add an arbitrary number of signal or background trees
    loader.AddSignalTree    ( signalTree,     signalWeight     )
@@ -115,8 +114,8 @@ note that you may also use variable expressions, which can be parsed by TTree::D
 #loader.SetBackgroundWeightExpression( "weight" )
 
 # Apply additional cuts on the signal and background samples (can be different)
-   TCut mycuts = "" # for example: TCut mycuts = "abs(var1)<0.5 && abs(var2-0.5)<1"
-   TCut mycutb = "" # for example: TCut mycutb = "abs(var1)<0.5"
+   mycuts = ROOT.TCut("") # for example: TCut mycuts = "abs(var1)<0.5 && abs(var2-0.5)<1"
+   mycutb = ROOT.TCut("") # for example: TCut mycutb = "abs(var1)<0.5"
 
 # Tell the factory how to use the training and testing events
 #
@@ -139,101 +138,101 @@ and a shallow neural network
 
  # Likelihood ("naive Bayes estimator")
 if (useLikelihood):
-   factory.BookMethod(loader, TMVA::Types::kLikelihood, "Likelihood",
-                           H, not V, TransformOutput:PDFInterpol=Spline2, NSmoothSig[0]=20 , NSmoothBkg[0]=20 , NSmoothBkg[1]=10 , NSmooth=1 , NAvEvtPerBin=50 )
+   factory.BookMethod(loader, ROOT.TMVA.Types.kLikelihood, "Likelihood",
+                           "H:!V:TransformOutput:PDFInterpol=Spline2:NSmoothSig[0]=20:NSmoothBkg[0]=20:NSmoothBkg[1]=10:NSmooth=1:NAvEvtPerBin=50" )
 
 # Use a kernel density estimator to approximate the PDFs
 if (useLikelihoodKDE):
-   factory.BookMethod(loader, TMVA::Types::kLikelihood, "LikelihoodKDE",
-                      not H, not V, not TransformOutput:PDFInterpol=KDE:KDEtype=Gauss, KDEiter=Adaptive, KDEFineFactor=0.3, KDEborder=None, NAvEvtPerBin=50 )
-
+   factory.BookMethod(loader, ROOT.TMVA.Types.kLikelihood, "LikelihoodKDE",
+                      "!H:!V:!TransformOutput:PDFInterpol=KDE:KDEtype=Gauss:KDEiter=Adaptive:KDEFineFactor=0.3:KDEborder=None:NAvEvtPerBin=50" )
 
 # Fisher discriminant (same as LD)
 if (useFischer):
-   factory.BookMethod(loader, TMVA::Types::kFisher, "Fisher", H, not V, Fisher:VarTransform=None, CreateMVAPdfs:PDFInterpolMVAPdf=Spline2, NbinsMVAPdf=50, NsmoothMVAPdf=10 )
+   factory.BookMethod(loader, ROOT.TMVA.Types.kFisher, "Fisher", "H:!V:Fisher:VarTransform=None:CreateMVAPdfs:PDFInterpolMVAPdf=Spline2:NbinsMVAPdf=50:NsmoothMVAPdf=10" )
 
 
 # Boosted Decision Trees
 if (useBDT):
-   factory.BookMethod(loader,TMVA::Types::kBDT, "BDT",
-                      not V, NTrees=200, MinNodeSize=2.5%, MaxDepth=2, BoostType=AdaBoost, AdaBoostBeta=0.5, UseBaggedBoost:BaggedSampleFraction=0.5, SeparationType=GiniIndex, nCuts=20 )
+   factory.BookMethod(loader,ROOT.TMVA.Types.kBDT, "BDT",
+                      "!V:NTrees=200:MinNodeSize=2.5%:MaxDepth=2:BoostType=AdaBoost:AdaBoostBeta=0.5:UseBaggedBoost:BaggedSampleFraction=0.5:SeparationType=GiniIndex:nCuts=20" )
 
 
 # Multi-Layer Perceptron (Neural Network)
 if (useMLP):
-   factory.BookMethod(loader, TMVA::Types::kMLP, "MLP",
-                      not H, not V, NeuronType=tanh, VarTransform=N, NCycles=100, HiddenLayers=N+5, TestRate=5, not UseRegulator )
+   factory.BookMethod(loader, ROOT.TMVA.Types.kMLP, "MLP",
+                      "!H:!V:NeuronType=tanh:VarTransform=N:NCycles=100:HiddenLayers=N+5:TestRate=5:!UseRegulator" )
 
 
 
 ## Here we book the new DNN of TMVA if we have support in ROOT. We will use GPU version if ROOT is enabled with GPU
 
 
-'''
+   '''
 
-## Booking Deep Neural Network
+   ## Booking Deep Neural Network
 
-Here we define the option string for building the Deep Neural network model.
+   Here we define the option string for building the Deep Neural network model.
 
-#### 1. Define DNN layout
+   #### 1. Define DNN layout
 
-The DNN configuration is defined using a string. Note that whitespaces between characters are not allowed.
+   The DNN configuration is defined using a string. Note that whitespaces between characters are not allowed.
 
-We define first the DNN layout:
+   We define first the DNN layout:
 
-- **input layout** :   this defines the input data format for the DNN as  ``input depth | height | width``.
-   In case of a dense layer as first layer the input layout should be  ``1 | 1 | number of input variables`` (features)
-- **batch layout**  : this defines how are the input batch. It is related to input layout but not the same.
-   If the first layer is dense it should be ``1 | batch size ! number of variables`` (features)
+   - **input layout** :   this defines the input data format for the DNN as  ``input depth | height | width``.
+      In case of a dense layer as first layer the input layout should be  ``1 | 1 | number of input variables`` (features)
+   - **batch layout**  : this defines how are the input batch. It is related to input layout but not the same.
+      If the first layer is dense it should be ``1 | batch size ! number of variables`` (features)
 
-   *(note the use of the character `|` as  separator of  input parameters for DNN layout)*
+      *(note the use of the character `|` as  separator of  input parameters for DNN layout)*
 
-note that in case of only dense layer the input layout could be omitted but it is required when defining more
-complex architectures
+   note that in case of only dense layer the input layout could be omitted but it is required when defining more
+   complex architectures
 
-- **layer layout** string defining the layer architecture. The syntax is
-   - layer type (e.g. DENSE, CONV, RNN)
-   - layer parameters (e.g. number of units)
-   - activation function (e.g  TANH, RELU,...)
+   - **layer layout** string defining the layer architecture. The syntax is
+      - layer type (e.g. DENSE, CONV, RNN)
+      - layer parameters (e.g. number of units)
+      - activation function (e.g  TANH, RELU,...)
 
-     *the different layers are separated by the ``","`` *
+      *the different layers are separated by the ``","`` *
 
-#### 2. Define Training Strategy
+   #### 2. Define Training Strategy
 
-We define here the training strategy parameters for the DNN. The parameters are separated by the ``","`` separator.
-One can then concatenate different training strategy with different parameters. The training strategy are separated by
-the ``"|"`` separator.
+   We define here the training strategy parameters for the DNN. The parameters are separated by the ``","`` separator.
+   One can then concatenate different training strategy with different parameters. The training strategy are separated by
+   the ``"|"`` separator.
 
- - Optimizer
- - Learning rate
- - Momentum (valid for SGD and RMSPROP)
- - Regularization and Weight Decay
- - Dropout
- - Max number of epochs
- - Convergence steps. if the test error will not decrease after that value the training will stop
- - Batch size (This value must be the same specified in the input layout)
- - Test Repetitions (the interval when the test error will be computed)
+   - Optimizer
+   - Learning rate
+   - Momentum (valid for SGD and RMSPROP)
+   - Regularization and Weight Decay
+   - Dropout
+   - Max number of epochs
+   - Convergence steps. if the test error will not decrease after that value the training will stop
+   - Batch size (This value must be the same specified in the input layout)
+   - Test Repetitions (the interval when the test error will be computed)
 
 
-#### 3. Define general DNN options
+   #### 3. Define general DNN options
 
-We define the general DNN options concatenating in the final string the previously defined layout and training strategy.
-Note we use the ``":"`` separator to separate the different higher level options, as in the other TMVA methods.
-In addition to input layout, batch layout and training strategy we add now:
+   We define the general DNN options concatenating in the final string the previously defined layout and training strategy.
+   Note we use the ``":"`` separator to separate the different higher level options, as in the other TMVA methods.
+   In addition to input layout, batch layout and training strategy we add now:
 
-- Type of Loss function (e.g. CROSSENTROPY)
-- Weight Initizalization (e.g XAVIER, XAVIERUNIFORM, NORMAL )
-- Variable Transformation
-- Type of Architecture (e.g. CPU, GPU, Standard)
+   - Type of Loss function (e.g. CROSSENTROPY)
+   - Weight Initizalization (e.g XAVIER, XAVIERUNIFORM, NORMAL )
+   - Variable Transformation
+   - Type of Architecture (e.g. CPU, GPU, Standard)
 
-We can then book the DL method using the built option string
+   We can then book the DL method using the built option string
 
    '''
 
    if (useDL):
 
       useDLGPU = false
-   if __debug__: R__HAS_TMVAGPU
+   if __debug__: 
+      R__HAS_TMVAGPU
       useDLGPU = true
 
       # Define DNN layout
@@ -276,7 +275,7 @@ We can then book the DL method using the built option string
          dnnOptions += ":Architecture=CPU"
       
 
-      factory.BookMethod(loader, TMVA::Types::kDL, dnnMethodName, dnnOptions)
+      factory.BookMethod(loader, ROOT.TMVA.Types.kDL, dnnMethodName, dnnOptions)
 
    
 
@@ -289,11 +288,11 @@ Here we train all the previously booked methods.
 
    factory.TrainAllMethods()
 
-'''
-   ## Test  all methods
+   '''
+      ## Test  all methods
 
- Now we test and evaluate all methods using the test data set
-'''
+   Now we test and evaluate all methods using the test data set
+   '''
 
    factory.TestAllMethods()
 
@@ -301,10 +300,11 @@ Here we train all the previously booked methods.
 
 ## after we get the ROC curve and we display
 
-   auto c1 = factory.GetROCCurve(loader)
+   c1 = factory.GetROCCurve(loader)
    c1.Draw()
 
 ## at the end we close the output file which contains the evaluation result of all methods and it can be used by TMVAGUI
 ## to display additional plots
 
    outputFile.Close()
+
