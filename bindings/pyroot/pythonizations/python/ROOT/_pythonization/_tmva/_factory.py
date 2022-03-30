@@ -16,4 +16,4 @@ class factory(object):
         The keywords must correspond to the CmdArgs of the function.
         """
         args, kwargs = _kwargs_to_Tmvacmdargs(*args, **kwargs)
-        return self._factory(*args, **kwargs)
+        return self._BookMethod(*args, **kwargs)
