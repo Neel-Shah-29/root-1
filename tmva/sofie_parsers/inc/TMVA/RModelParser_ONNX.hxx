@@ -39,6 +39,8 @@ std::unique_ptr<ROperator> make_ROperator_GemmFromMatMulandAdd(const onnx::NodeP
 std::unique_ptr<ROperator> make_ROperator_Reshape(const onnx::NodeProto &nodeproto, const onnx::GraphProto &graphproto, std::unordered_map<std::string, ETensorType> &tensor_type);
 std::unique_ptr<ROperator> make_ROperator_Slice(const onnx::NodeProto &nodeproto, const onnx::GraphProto &graphproto, std::unordered_map<std::string, ETensorType> &tensor_type);
 std::unique_ptr<ROperator> make_ROperator_GRU(const onnx::NodeProto& nodeproto, const onnx::GraphProto& graphproto, std::unordered_map<std::string, ETensorType>& tensor_type);
+template <ReduceOpMode Op1>
+std::unique_ptr<ROperator> make_ROperator_Reduce(const onnx::NodeProto& nodeproto, const onnx::GraphProto& graphproto, std::unordered_map<std::string, ETensorType>& tensor_type);
 template <EBasicBinaryOperator Op1>
 std::unique_ptr<ROperator> make_ROperator_BasicBinary(const onnx::NodeProto &nodeproto, const onnx::GraphProto &graphproto, std::unordered_map<std::string, ETensorType> &tensor_type);
 std::unique_ptr<ROperator> make_ROperator_Identity(const onnx::NodeProto &nodeproto, const onnx::GraphProto &graphproto, std::unordered_map<std::string, ETensorType> &tensor_type);
@@ -65,6 +67,9 @@ const factoryMethodMap mapOptypeOperator = {
    {"Sub", &make_ROperator_BasicBinary<Sub>},
    {"Mul", &make_ROperator_BasicBinary<Mul>},
    {"Div", &make_ROperator_BasicBinary<Div>},
+   {"Reduce_mean", &make_ROperator_Reduce<Reduce_mean>},
+   {"Reduce_sumsquare", &make_ROperator_Reduce<Reduce_sumsquare>},
+   {"Reduce_prod", &make_ROperator_Reduce<Reduce_prod>},
    {"Reshape", &make_ROperator_Reshape},
    {"Flatten", &make_ROperator_Reshape},
    {"Slice", &make_ROperator_Slice},
