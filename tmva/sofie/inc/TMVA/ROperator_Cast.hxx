@@ -60,12 +60,12 @@ public:
 
       out << "\n//------ CAST\n";
       out << SP << "for (int id = 0; id < " << length << " ; id++){\n";
-      if(fCastMode == int_cast)
-        out << SP << SP << "tensor_" << fNY << "[id] = (int)(tensor_" << fNX << "[id]);\n";
-      if(fCastMode == float_cast)
+      // if(fCastMode == int_cast)
+      //   out << SP << SP << "tensor_" << fNY << "[id] = (int)(tensor_" << fNX << "[id]);\n";
+      // if(fCastMode == float_cast)
         out << SP << SP << "tensor_" << fNY << "[id] = (float)(tensor_" << fNX << "[id]);\n";
-      if(fCastMode == double_cast)
-        out << SP << SP << "tensor_" << fNY << "[id] = (double)(tensor_" << fNX << "[id]);\n";
+      // if(fCastMode == double_cast)
+      //   out << SP << SP << "tensor_" << fNY << "[id] = (double)(tensor_" << fNX << "[id]);\n";
       out << SP << "}\n";
       return out.str();
    }

@@ -1115,13 +1115,13 @@ std::unique_ptr<ROperator> make_ROperator_Concat(const onnx::NodeProto &nodeprot
 
    ETensorType input_type;
 
-   CastOpMode op_mode;
-   if (nodeproto.op_type() == "float")
-      op_mode = float_cast;
-   else if (nodeproto.op_type() == "int")
-      op_mode = int_cast;
-   else if (nodeproto.op_type() == "double")
-      op_mode = double_cast;
+   // CastOpMode op_mode;
+   // if (nodeproto.op_type() == "float")
+   //    op_mode = float_cast;
+   // else if (nodeproto.op_type() == "int")
+   //    op_mode = int_cast;
+   // else if (nodeproto.op_type() == "double")
+   //    op_mode = double_cast;
       
    auto input_name =  nodeproto.input(0);
    auto it = tensor_type.find(input_name);

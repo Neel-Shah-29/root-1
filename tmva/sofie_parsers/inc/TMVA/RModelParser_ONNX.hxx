@@ -75,9 +75,7 @@ const factoryMethodMap mapOptypeOperator = {
    {"Identity", &make_ROperator_Identity},
    {"Softmax", &make_ROperator_Softmax},
    {"Concat", &make_ROperator_Concat},
-   {"int_cast", &make_ROperator_Cast},
-   {"float_cast", &make_ROperator_Cast},
-   {"double_cast", &make_ROperator_Cast}
+   {"Cast", &make_ROperator_Cast}
 };
 
 using factoryMethodMap1 = std::unordered_map<std::string, std::unique_ptr<ROperator> (*)(const onnx::NodeProto&,const onnx::NodeProto&, const onnx::GraphProto&, std::unordered_map<std::string, ETensorType>&)>;
