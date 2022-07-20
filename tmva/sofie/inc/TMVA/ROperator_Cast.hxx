@@ -11,7 +11,6 @@ namespace TMVA{
 namespace Experimental{
 namespace SOFIE{
 
-enum CastOpMode { int_cast, float_cast, double_cast };
 
 template <typename T>
 class ROperator_Cast final : public ROperator
@@ -19,7 +18,6 @@ class ROperator_Cast final : public ROperator
 
 private:
 
-   CastOpMode fCastMode; 
    std::string fNX;
    std::string fNY;
    std::vector<size_t> fShape;
@@ -60,12 +58,9 @@ public:
 
       out << "\n//------ CAST\n";
       out << SP << "for (int id = 0; id < " << length << " ; id++){\n";
-      // if(fCastMode == int_cast)
-      //   out << SP << SP << "tensor_" << fNY << "[id] = (int)(tensor_" << fNX << "[id]);\n";
-      // if(fCastMode == float_cast)
+
       out << SP << SP << "tensor_" << fNY << "[id] = (float)(tensor_" << fNX << "[id]);\n";
-      // if(fCastMode == double_cast)
-      //   out << SP << SP << "tensor_" << fNY << "[id] = (double)(tensor_" << fNX << "[id]);\n";
+
       out << SP << "}\n";
       return out.str();
    }
