@@ -1135,6 +1135,8 @@ std::unique_ptr<ROperator> make_ROperator_Concat(const onnx::NodeProto &nodeprot
 
 
    switch(input_type){
+   case ETensorType::INT64:
+   case ETensorType::DOUBLE:
    case ETensorType::FLOAT:
       op.reset(new ROperator_Cast<float>(nodeproto.input(0), nodeproto.output(0)));
       break;

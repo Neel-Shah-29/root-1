@@ -301,7 +301,7 @@ TEST(ONNX, Cast)
       constexpr float TOLERANCE = DEFAULT_TOLERANCE;
 
    // Preparing the standard  input
-   std::vector<float> input({
+   std::vector<int> input({
       1,2,3,4,5,6
    });
 

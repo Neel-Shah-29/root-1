@@ -53,7 +53,7 @@ public:
    std::string Generate(std::string OpName){
       OpName = "op_" + OpName;
       if (fShape.empty()) {
-         throw std::runtime_error("TMVA SOFIE Transpose Cast called to Generate without being initialized first");
+         throw std::runtime_error("TMVA SOFIE Cast called to Generate without being initialized first");
       }
       std::stringstream out;
       size_t length = ConvertShapeToLength(fShape);
@@ -63,7 +63,7 @@ public:
       // if(fCastMode == int_cast)
       //   out << SP << SP << "tensor_" << fNY << "[id] = (int)(tensor_" << fNX << "[id]);\n";
       // if(fCastMode == float_cast)
-        out << SP << SP << "tensor_" << fNY << "[id] = (float)(tensor_" << fNX << "[id]);\n";
+      out << SP << SP << "tensor_" << fNY << "[id] = (float)(tensor_" << fNX << "[id]);\n";
       // if(fCastMode == double_cast)
       //   out << SP << SP << "tensor_" << fNY << "[id] = (double)(tensor_" << fNX << "[id]);\n";
       out << SP << "}\n";
