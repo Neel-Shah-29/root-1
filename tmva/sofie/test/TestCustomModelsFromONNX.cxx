@@ -698,6 +698,28 @@ TEST(ONNX, AvgPool){
 
 }
 
+TEST(ONNX, Shape){
+   constexpr float TOLERANCE = DEFAULT_TOLERANCE;
+
+   // Preparing the standard  input
+   std::vector<float> input({
+      1, 2
+   });
+   
+   TMVA_SOFIE_Shape::Session s("Shape_FromONNX.dat");
+   std::vector<int> output = s.infer(input.data());
+   // Checking output size
+   EXPECT_EQ(output.size(), sizeof(Shape_ExpectedOutput::outputs) / sizeof(float));
+   
+   float *correct = Shape_ExpectedOutput::outputs;
+
+   // Checking every output value, one by one
+   for (size_t i = 0; i < output.size(); ++i) {
+      EXPECT_LE(std::abs(output[i] - correct[i]), TOLERANCE);
+   }
+
+}
+
 TEST(ONNX, RNNBatchwise)
 {
    constexpr float TOLERANCE = DEFAULT_TOLERANCE;

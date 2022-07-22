@@ -1192,13 +1192,14 @@ std::unique_ptr<ROperator> make_ROperator_Shape(const onnx::NodeProto& nodeproto
 
    switch(input_type){
    case ETensorType::FLOAT:
+   case ETensorType::INT64:
       op.reset(new ROperator_Shape<float>(nodeproto.input(0), nodeproto.output(0)));
       break;
    default:
       throw std::runtime_error("TMVA::SOFIE - Unsupported - Operator Shape does not yet support input type " + std::to_string(static_cast<int>(input_type)));
    }
 
-   ETensorType output_type = (op->TypeInference({input_type}))[0];
+   ETensorType output_type = ETensorType::INT64;
    auto it2 = tensor_type.find(nodeproto.output(0));
    if (it2 == tensor_type.end()){
       tensor_type[nodeproto.output(0)] = output_type;
