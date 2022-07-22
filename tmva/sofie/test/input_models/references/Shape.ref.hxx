@@ -1,5 +1,5 @@
 namespace Shape_ExpectedOutput{
-	float outputs[] = {
+	int outputs[] = {
         1, 2
 	};
 } // namespace Shape_ExpectedOutput
