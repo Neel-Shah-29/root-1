@@ -22,8 +22,6 @@ class ROperator_Shape final : public ROperator
 private:
 
    /* Attributes*/
-   // int start = 0; //default value
-   // int end ;
    std::string fNX;
    std::string fNY;
    std::vector<size_t> fShape;
@@ -60,13 +58,10 @@ public:
       }
       std::stringstream out;
       
-      // size_t length = ConvertShapeToLength(fShape);
+      
       std::stringstream result;
       std::copy(fShape.begin(), fShape.end(), std::ostream_iterator<int>(result, ""));
 
-      // out << SP << "int " << OpName << "_start = "  << fstart << ";\n";
-      // out << SP << "int " << OpName << "_end = "  << fend << ";\n";
-   
       out << "\n//------ Shape\n";
       out << SP << "for (int id = 0; id < " << fShape.size() << " ; id++){\n";
       out << SP << SP << "tensor_" << fNY << "[id] = " << result.str() << "[id] ;\n";
