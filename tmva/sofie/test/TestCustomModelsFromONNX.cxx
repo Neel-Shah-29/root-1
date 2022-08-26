@@ -33,6 +33,9 @@
 #include "Cast_FromONNX.hxx"
 #include "input_models/references/Cast.ref.hxx"
 
+#include "Equal_FromONNX.hxx"
+#include "input_models/references/Equal.ref.hxx"
+
 #include "LinearWithLeakyRelu_FromONNX.hxx"
 #include "input_models/references/LinearWithLeakyRelu.ref.hxx"
 
@@ -777,6 +780,31 @@ TEST(ONNX, Pow_broadcast){
    // Checking every output value, one by one
    for (size_t i = 0; i < output.size(); ++i) {
       EXPECT_LE(std::abs(output[i] - correct[i]), TOLERANCE);
+   }
+
+}
+
+TEST(ONNX, Equal){
+   constexpr float TOLERANCE = 0;
+
+   // Preparing the standard  input
+   std::vector<float> input1({
+      1.0, 2.0, 3.0
+   });
+   std::vector<float> input2({
+      4.0, 2.0, 6.0
+   });
+   
+   TMVA_SOFIE_Equal::Session s("Equal_FromONNX.dat");
+   std::vector<bool> output = s.infer(input2.data(),input1.data());
+   // Checking output size
+   EXPECT_EQ(output.size(), sizeof(Equal_ExpectedOutput::outputs) / sizeof(bool));
+   
+   bool *correct = Equal_ExpectedOutput::outputs;
+
+   // Checking every output value, one by one
+   for (size_t i = 0; i < output.size(); ++i) {
+      EXPECT_LE(((correct[i]==output[i])?0:1), TOLERANCE);
    }
 
 }

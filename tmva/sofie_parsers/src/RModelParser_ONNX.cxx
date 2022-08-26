@@ -84,6 +84,51 @@ std::unique_ptr<ROperator> make_ROperator_BasicBinary(const onnx::NodeProto& nod
    return op;
 }
 
+std::unique_ptr<ROperator> make_ROperator_Equal(const onnx::NodeProto& nodeproto, const onnx::GraphProto& graphproto, std::unordered_map<std::string, ETensorType>& tensor_type){
+
+   ETensorType input_type = ETensorType::UNDEFINED;
+
+   for (int i = 0; i < 2; ++i) {
+      auto input_name = nodeproto.input(i);
+      auto it = tensor_type.find(input_name);
+      if (it != tensor_type.end()){
+         // according to ONNX both inputs have same time
+         if (i == 0) input_type = it->second;
+         else
+            assert(it->second == input_type);
+      } else {
+         // check if input tensor is an initialized tensor
+         bool isInitializer = false;
+         for (int j=0; j < graphproto.initializer_size(); j++){
+            if (input_name == graphproto.initializer(j).name()) {
+               isInitializer = true;
+               break;
+            }
+         }
+         if (!isInitializer)
+            throw std::runtime_error("TMVA::SOFIE ONNX Parser Equal op has input tensor " + input_name + " but its type is not yet registered");
+      }
+   }
+
+   std::unique_ptr<ROperator> op;
+
+   switch(input_type){
+   case ETensorType::FLOAT:
+      op.reset(new ROperator_Equal<float>(nodeproto.input(0), nodeproto.input(1), nodeproto.output(0)));
+      break;
+   default:
+      throw std::runtime_error("TMVA::SOFIE - Unsupported - Equal Operator does not yet support input type " + std::to_string(static_cast<int>(input_type)));
+   }
+
+   ETensorType output_type = ETensorType::BOOL;
+   auto it2 = tensor_type.find(nodeproto.output(0));
+   if (it2 == tensor_type.end()){
+      tensor_type[nodeproto.output(0)] = output_type;
+   }
+
+   return op;
+}
+
 std::unique_ptr<ROperator> make_ROperator_Neg(const onnx::NodeProto& nodeproto, const onnx::GraphProto& /*graphproto */, std::unordered_map<std::string, ETensorType>& tensor_type){
 
    ETensorType input_type;
