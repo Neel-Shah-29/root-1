@@ -32,7 +32,7 @@ ParserFuncSignature ParseMatMul = [](RModelParser_ONNX &parser, const onnx::Node
       break;
    default:
       throw std::runtime_error(
-         "TMVA::SOFIE - Unsupported - Operator for fusing MatMul and Add to Gemm does not yet support input type " +
+         "TMVA::SOFIE - Unsupported - Operator for fusing MatMul to Gemm does not yet support input type " +
          std::to_string(static_cast<int>(input_type)));
    }
 

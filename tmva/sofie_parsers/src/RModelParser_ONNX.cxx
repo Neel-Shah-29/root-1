@@ -185,6 +185,7 @@ RModelParser_ONNX::ParseOperator(const size_t i, const onnx::GraphProto &graphpr
       if (idx2 < graphproto.node_size() && graphproto.node(idx2).op_type() == "Add") {
          return ParseFuseMatMulAdd(*this, graphproto.node(idx), graphproto.node(idx2));
       }
+      // If MatMul operator is not followed by Add Operator
       else if(graphproto.node(idx2).op_type() != "Add"){
          return ParseMatMul(*this, graphproto.node(idx));
       }
