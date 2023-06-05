@@ -68,4 +68,4 @@ public:
 }//TMVA
 
 
-#endif //TMVA_SOFIE_ROPERATOR_Tanh
+#endif //TMVA_SOFIE_ROPERATOR_Log
