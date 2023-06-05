@@ -239,6 +239,9 @@
 #include "GatherNegativeIndices_FromONNX.hxx"
 #include "input_models/references/GatherNegativeIndices.ref.hxx"
 
+#include "Log_FromONNX.hxx"
+#include "input_models/references/Log.ref.hxx"
+
 #include "gtest/gtest.h"
 
 constexpr float DEFAULT_TOLERANCE = 1e-3f;
@@ -506,6 +509,31 @@ TEST(ONNX, Tanh)
       EXPECT_LE(std::abs(output[i] - correct[i]), TOLERANCE);
    }
 }
+
+TEST(ONNX, Log)
+{
+   constexpr float TOLERANCE = DEFAULT_TOLERANCE;
+
+   // Preparing the random input
+   std::vector<float> input({
+     0.0000, 0.6931, 1.0986, 1.3863
+   });
+
+   TMVA_SOFIE_Log::Session s("Log_FromONNX.dat");
+
+   std::vector<float> output = s.infer(input.data());
+
+   // Checking output size
+   EXPECT_EQ(output.size(), sizeof(Log_ExpectedOutput::outputs) / sizeof(float));
+
+   float *correct = Log_ExpectedOutput::outputs;
+
+   // Checking every output value, one by one
+   for (size_t i = 0; i < output.size(); ++i) {
+      EXPECT_LE(std::abs(output[i] - correct[i]), TOLERANCE);
+   }
+}
+
 
 TEST(ONNX, LinearWithLeakyRelu)
 {
