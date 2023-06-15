@@ -227,6 +227,11 @@ ROOT::Experimental::RResult<void> ROOT::Experimental::RNTupleImporter::PrepareSc
          if (isFixedSizeArray)
             fieldType = "std::array<" + fieldType + "," + std::to_string(countval) + ">";
 
+         if (fConvertDotsInBranchNames) {
+            // Replace any occurrence of a dot ('.') with an underscore.
+            std::replace(fieldName.begin(), fieldName.end(), '.', '_');
+         }
+
          RImportField f;
          f.fIsClass = isClass;
          auto fieldOrError = Detail::RFieldBase::Create(fieldName, fieldType);
@@ -330,7 +335,7 @@ ROOT::Experimental::RResult<void> ROOT::Experimental::RNTupleImporter::PrepareSc
       }
       // Add projected fields for count leaf
       auto projectedField =
-         Detail::RFieldBase::Create(countLeafName, "ROOT::Experimental::RNTupleCardinality").Unwrap();
+         Detail::RFieldBase::Create(countLeafName, "ROOT::Experimental::RNTupleCardinality<std::uint32_t>").Unwrap();
       fModel->AddProjectedField(std::move(projectedField), [&c](const std::string &) { return c.fFieldName; });
       iLeafCountCollection++;
    }

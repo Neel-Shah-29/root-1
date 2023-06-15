@@ -176,8 +176,8 @@ Var::Var(const JSONNode &val)
       else
          this->max = val["max"].val_double();
    } else if (val.is_seq()) {
-      for (size_t i = 0; i < val.num_children(); ++i) {
-         this->bounds.push_back(val[i].val_double());
+      for (auto const &child : val.children()) {
+         this->bounds.push_back(child.val_double());
       }
       this->nbins = this->bounds.size();
       this->min = this->bounds[0];
@@ -303,7 +303,7 @@ void exportAttributes(const RooAbsArg *arg, JSONNode &rootnode)
       if (node)
          return;
 
-      node = &RooJSONFactoryWSTool::getRooFitInternal(rootnode, "attributes")[arg->GetName()];
+      node = &RooJSONFactoryWSTool::getRooFitInternal(rootnode, "attributes").set_map()[arg->GetName()].set_map();
    };
 
    // We have to remember if the variable was a constant RooRealVar or a
@@ -380,8 +380,12 @@ std::unique_ptr<RooAbsData> loadData(const JSONNode &p, RooWorkspace &workspace)
       if (!coords.is_seq()) {
          RooJSONFactoryWSTool::error("key 'entries' is not a list!");
       }
-      for (size_t i = 0; i < coords.num_children(); ++i) {
-         auto &point = coords[i];
+      std::vector<double> weightVals;
+      for (auto const &weight : weights.children()) {
+         weightVals.push_back(weight.val_double());
+      }
+      std::size_t i = 0;
+      for (auto const &point : coords.children()) {
          if (!point.is_seq()) {
             std::stringstream errMsg;
             errMsg << "coordinate point '" << i << "' is not a list!";
@@ -390,11 +394,14 @@ std::unique_ptr<RooAbsData> loadData(const JSONNode &p, RooWorkspace &workspace)
          if (point.num_children() != varlist.size()) {
             RooJSONFactoryWSTool::error("inconsistent number of entries and observables!");
          }
-         for (size_t j = 0; j < point.num_children(); ++j) {
+         std::size_t j = 0;
+         for (auto const &pointj : point.children()) {
             auto *v = static_cast<RooRealVar *>(varlist.at(j));
-            v->setVal(point[j].val_double());
+            v->setVal(pointj.val_double());
+            ++j;
          }
-         data->add(vars, weights[i].val_double());
+         data->add(vars, weightVals[i]);
+         ++i;
       }
       return data;
    }
@@ -431,6 +438,13 @@ void importAnalysis(const JSONNode &rootnode, const JSONNode &analysisNode, cons
    for (auto &nameNode : (*nllNode)["distributions"].children()) {
       nllDistNames.push_back(nameNode.val());
    }
+   RooArgSet extConstraints;
+   for (auto &nameNode : (*nllNode)["aux_distributions"].children()) {
+      RooAbsArg *extConstraint = workspace.arg(nameNode.val());
+      if (extConstraint) {
+         extConstraints.add(*extConstraint);
+      }
+   }
    RooArgSet observables;
    for (auto &nameNode : (*nllNode)["data"].children()) {
       nllDataNames.push_back(nameNode.val());
@@ -449,6 +463,9 @@ void importAnalysis(const JSONNode &rootnode, const JSONNode &analysisNode, cons
       std::runtime_error("pdf not found!");
 
    mc->SetPdf(*pdf);
+
+   if(!extConstraints.empty())
+      mc->SetExternalConstraints(extConstraints);
 
    auto readArgSet = [&](std::string const &name) {
       RooArgSet out;
@@ -648,7 +665,7 @@ RooAbsReal *RooJSONFactoryWSTool::requestImpl<RooAbsReal>(const std::string &obj
    return nullptr;
 }
 
-void RooJSONFactoryWSTool::exportVariable(const RooAbsArg *v, JSONNode &n)
+void RooJSONFactoryWSTool::exportVariable(const RooAbsArg *v, JSONNode &node)
 {
    auto *cv = dynamic_cast<const RooConstVar *>(v);
    auto *rrv = dynamic_cast<const RooRealVar *>(v);
@@ -660,12 +677,14 @@ void RooJSONFactoryWSTool::exportVariable(const RooAbsArg *v, JSONNode &n)
       return;
    }
 
+   node.set_seq();
+
    // this variable was already exported
-   if (findNamedChild(n, v->GetName())) {
+   if (findNamedChild(node, v->GetName())) {
       return;
    }
 
-   JSONNode &var = appendNamedChild(n, v->GetName());
+   JSONNode &var = appendNamedChild(node, v->GetName());
 
    if (cv) {
       var["value"] << cv->getVal();
@@ -712,8 +731,8 @@ void RooJSONFactoryWSTool::exportObject(RooAbsArg const &func, std::set<std::str
          channelNames.push_back(item.first);
       }
 
-      auto &infoNode = getRooFitInternal(*_rootnodeOutput, "combined_distributions");
-      auto &child = infoNode[simPdf->GetName()];
+      auto &infoNode = getRooFitInternal(*_rootnodeOutput, "combined_distributions").set_map();
+      auto &child = infoNode[simPdf->GetName()].set_map();
       child["index_cat"] << simPdf->indexCat().GetName();
       exportCategory(simPdf->indexCat(), child);
       child["distributions"].set_seq();
@@ -748,7 +767,9 @@ void RooJSONFactoryWSTool::exportObject(RooAbsArg const &func, std::set<std::str
             // before failing. That's why we clear it and only reset the name.
             elem.clear();
             elem.set_map();
-            elem["name"] << name;
+            if (useListsInsteadOfDicts) {
+               elem["name"] << name;
+            }
             continue;
          }
          if (exp->autoExportDependants()) {
@@ -977,7 +998,7 @@ RooJSONFactoryWSTool::CombinedData RooJSONFactoryWSTool::exportCombinedData(RooA
    datamap.name = data.GetName();
 
    // Write information necessary to reconstruct the combined dataset upon import
-   auto &child = getRooFitInternal(*_rootnodeOutput, "combined_datas")[data.GetName()];
+   auto &child = getRooFitInternal(*_rootnodeOutput, "combined_datas").set_map()[data.GetName()].set_map();
    child["index_cat"] << cat->GetName();
    exportCategory(*cat, child);
 
@@ -1135,12 +1156,24 @@ RooJSONFactoryWSTool::readBinnedData(const JSONNode &n, const std::string &name,
       v->setDirtyInhibit(true);
       initVals.push_back(static_cast<RooAbsReal const *>(v)->getVal());
    }
+   std::vector<double> contentVals;
+   contentVals.reserve(contents.num_children());
+   for (auto const &cont : contents.children()) {
+      contentVals.push_back(cont.val_double());
+   }
+   std::vector<double> errorVals;
+   if (errors) {
+      errorVals.reserve(errors->num_children());
+      for (auto const &err : errors->children()) {
+         errorVals.push_back(err.val_double());
+      }
+   }
    for (size_t ibin = 0; ibin < bins.size(); ++ibin) {
       for (size_t i = 0; i < bins[ibin].size(); ++i) {
          static_cast<RooRealVar *>(varlist.at(i))->setBin(bins[ibin][i]);
       }
-      const double err = errors ? (*errors)[ibin].val_double() : -1;
-      dh->add(varlist, contents[ibin].val_double(), err > 0 ? err * err : -1);
+      const double err = errors ? errorVals[ibin] : -1;
+      dh->add(varlist, contentVals[ibin], err > 0 ? err * err : -1);
    }
    // re-enable dirty flag propagation
    for (size_t i = 0; i < varlist.size(); ++i) {
@@ -1243,6 +1276,13 @@ void RooJSONFactoryWSTool::exportSingleModelConfig(JSONNode &rootnode, RooStats:
       if (dataComponents) {
          const auto &d = dataComponents->find(item.first);
          nllNode["data"].append_child() << d->second;
+      }
+   }
+   if (mc.GetExternalConstraints()) {
+      auto &extConstrNode = nllNode["aux_distributions"];
+      extConstrNode.set_seq();
+      for (const auto &constr : *mc.GetExternalConstraints()) {
+         extConstrNode.append_child() << constr->GetName();
       }
    }
 

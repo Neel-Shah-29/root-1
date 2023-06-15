@@ -1,6 +1,7 @@
 /// \file RNTupleDescriptor.cxx
 /// \ingroup NTuple ROOT7
 /// \author Jakob Blomer <jblomer@cern.ch>
+/// \author Javier Lopez-Gomez <javier.lopez.gomez@cern.ch>
 /// \date 2018-10-04
 /// \warning This is part of the ROOT 7 prototype! It will change without notice. It might trigger earthquakes. Feedback
 /// is welcome!
@@ -18,6 +19,7 @@
 #include <ROOT/RNTupleDescriptor.hxx>
 #include <ROOT/RNTupleModel.hxx>
 #include <ROOT/RNTupleUtil.hxx>
+#include <ROOT/RPage.hxx>
 #include <ROOT/RStringView.hxx>
 
 #include <RZip.h>
@@ -102,6 +104,7 @@ ROOT::Experimental::RColumnDescriptor::Clone() const
    clone.fModel = fModel;
    clone.fFieldId = fFieldId;
    clone.fIndex = fIndex;
+   clone.fFirstElementIndex = fFirstElementIndex;
    return clone;
 }
 
@@ -129,6 +132,39 @@ ROOT::Experimental::RClusterDescriptor::RPageRange::Find(ROOT::Experimental::RCl
    return RPageInfoExtended{pageInfo, firstInPage, pageNo};
 }
 
+std::size_t
+ROOT::Experimental::RClusterDescriptor::RPageRange::ExtendToFitColumnRange(const RColumnRange &columnRange,
+                                                                           const Detail::RColumnElementBase &element,
+                                                                           std::size_t pageSize)
+{
+   R__ASSERT(fPhysicalColumnId == columnRange.fPhysicalColumnId);
+
+   const auto nElements = std::accumulate(fPageInfos.begin(), fPageInfos.end(), 0U,
+                                          [](std::size_t n, const auto &PI) { return n + PI.fNElements; });
+   const auto nElementsRequired = static_cast<std::uint64_t>(columnRange.fNElements);
+
+   if (nElementsRequired == nElements)
+      return 0U;
+   R__ASSERT((nElementsRequired > nElements) && "invalid attempt to shrink RPageRange");
+
+   std::vector<RPageInfo> pageInfos;
+   // Synthesize new `RPageInfo`s as needed
+   const std::uint64_t nElementsPerPage = pageSize / element.GetSize();
+   R__ASSERT(nElementsPerPage > 0);
+   for (auto nRemainingElements = nElementsRequired - nElements; nRemainingElements > 0;) {
+      RPageInfo PI;
+      PI.fNElements = std::min(nElementsPerPage, nRemainingElements);
+      PI.fLocator.fType = RNTupleLocator::kTypePageZero;
+      PI.fLocator.fBytesOnStorage = element.GetPackedSize(PI.fNElements);
+      pageInfos.emplace_back(PI);
+      nRemainingElements -= PI.fNElements;
+   }
+
+   pageInfos.insert(pageInfos.end(), std::make_move_iterator(fPageInfos.begin()),
+                    std::make_move_iterator(fPageInfos.end()));
+   std::swap(fPageInfos, pageInfos);
+   return nElementsRequired - nElements;
+}
 
 bool ROOT::Experimental::RClusterDescriptor::operator==(const RClusterDescriptor &other) const
 {
@@ -439,6 +475,58 @@ ROOT::Experimental::RClusterDescriptorBuilder::CommitColumnRange(DescriptorId_t 
    return RResult<void>::Success();
 }
 
+ROOT::Experimental::RClusterDescriptorBuilder &
+ROOT::Experimental::RClusterDescriptorBuilder::AddDeferredColumnRanges(const RNTupleDescriptor &desc)
+{
+   /// Carries out a depth-first traversal of a field subtree rooted at `rootFieldId`.  For each field, `visitField` is
+   /// called passing the field ID and the number of overall repetitions, taking into account the repetitions of each
+   /// parent field in the hierarchy.
+   auto fnTraverseSubtree = [&](DescriptorId_t rootFieldId, std::uint64_t nRepetitionsAtThisLevel,
+                                const auto &visitField, const auto &enterSubtree) -> void {
+      visitField(rootFieldId, nRepetitionsAtThisLevel);
+      for (const auto &f : desc.GetFieldIterable(rootFieldId)) {
+         const std::uint64_t nRepetitions = std::max(f.GetNRepetitions(), std::uint64_t{1U}) * nRepetitionsAtThisLevel;
+         enterSubtree(f.GetId(), nRepetitions, visitField, enterSubtree);
+      }
+   };
+
+   // Deferred columns can only be part of the header extension
+   auto xHeader = desc.GetHeaderExtension();
+   if (!xHeader)
+      return *this;
+
+   // Ensure that all columns in the header extension have their associated `R(Column|Page)Range`
+   for (const auto &topLevelFieldId : xHeader->GetTopLevelFields(desc)) {
+      fnTraverseSubtree(
+         topLevelFieldId, std::max(desc.GetFieldDescriptor(topLevelFieldId).GetNRepetitions(), std::uint64_t{1U}),
+         [&](DescriptorId_t fieldId, std::uint64_t nRepetitions) {
+            for (const auto &c : desc.GetColumnIterable(fieldId)) {
+               const DescriptorId_t physicalId = c.GetPhysicalId();
+               auto &columnRange = fCluster.fColumnRanges[physicalId];
+               auto &pageRange = fCluster.fPageRanges[physicalId];
+               // Initialize a RColumnRange for `physicalId` if it was not there
+               if (columnRange.fPhysicalColumnId == kInvalidDescriptorId) {
+                  columnRange.fPhysicalColumnId = physicalId;
+                  pageRange.fPhysicalColumnId = physicalId;
+               }
+               // Fixup the RColumnRange and RPageRange in deferred columns.  We know what the first element index and
+               // number of elements should have been if the column was not deferred; fix those and let
+               // `ExtendToFitColumnRange()` synthesize RPageInfos accordingly.
+               // Note that a column whose first element index is != 0 already met the criteria of
+               // `RFieldBase::EntryToColumnElementIndex()`, i.e. it is a principal column reachable from the field zero
+               // excluding subfields of collection and variant fields.
+               if (c.IsDeferredColumn()) {
+                  columnRange.fFirstElementIndex = fCluster.GetFirstEntryIndex() * nRepetitions;
+                  columnRange.fNElements = fCluster.GetNEntries() * nRepetitions;
+                  const auto element = Detail::RColumnElementBase::Generate<void>(c.GetModel().GetType());
+                  pageRange.ExtendToFitColumnRange(columnRange, *element, Detail::RPage::kPageZeroSize);
+               }
+            }
+         },
+         fnTraverseSubtree);
+   }
+   return *this;
+}
 
 ROOT::Experimental::RResult<ROOT::Experimental::RClusterDescriptor>
 ROOT::Experimental::RClusterDescriptorBuilder::MoveDescriptor()
@@ -624,7 +712,7 @@ ROOT::Experimental::RNTupleDescriptorBuilder::AddFieldLink(DescriptorId_t fieldI
 
 void ROOT::Experimental::RNTupleDescriptorBuilder::AddColumn(DescriptorId_t logicalId, DescriptorId_t physicalId,
                                                              DescriptorId_t fieldId, const RColumnModel &model,
-                                                             std::uint32_t index)
+                                                             std::uint32_t index, std::uint64_t firstElementIdx)
 {
    RColumnDescriptor c;
    c.fLogicalColumnId = logicalId;
@@ -632,6 +720,7 @@ void ROOT::Experimental::RNTupleDescriptorBuilder::AddColumn(DescriptorId_t logi
    c.fFieldId = fieldId;
    c.fModel = model;
    c.fIndex = index;
+   c.fFirstElementIndex = firstElementIdx;
    if (!c.IsAliasColumn())
       fDescriptor.fNPhysicalColumns++;
    if (fDescriptor.fHeaderExtension)

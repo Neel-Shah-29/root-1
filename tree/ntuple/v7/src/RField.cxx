@@ -153,6 +153,9 @@ std::pair<std::string, std::string> GetNormalizedType(const std::string &typeNam
    // The following types are asummed to be canonical names; thus, do not perform `typedef` resolution on those
    if (normalizedType == "ROOT::Experimental::ClusterSize_t")
       return std::make_pair(normalizedType, "");
+   // We want the template parameter to stay in "std::uint32_t" / "std::uint64_t" form
+   if (normalizedType.substr(0, 39) == "ROOT::Experimental::RNTupleCardinality<")
+      return std::make_pair(normalizedType, "");
 
    std::string resolvedType = TClassEdit::ResolveTypedef(normalizedType.c_str());
    if (resolvedType == normalizedType)
@@ -255,8 +258,6 @@ ROOT::Experimental::Detail::RFieldBase::Create(const std::string &fieldName, con
 
    if (normalizedType == "ROOT::Experimental::ClusterSize_t") {
       result = std::make_unique<RField<ClusterSize_t>>(fieldName);
-   } else if (normalizedType == "ROOT::Experimental::RNTupleCardinality") {
-      result = std::make_unique<RField<RNTupleCardinality>>(fieldName);
    } else if (normalizedType == "bool") {
       result = std::make_unique<RField<bool>>(fieldName);
    } else if (normalizedType == "char") {
@@ -337,6 +338,17 @@ ROOT::Experimental::Detail::RFieldBase::Create(const std::string &fieldName, con
    } else if (normalizedType == ":Collection:") {
       // TODO: create an RCollectionField?
       result = std::make_unique<RField<ClusterSize_t>>(fieldName);
+   } else if (normalizedType.substr(0, 39) == "ROOT::Experimental::RNTupleCardinality<") {
+      auto innerTypes = TokenizeTypeList(normalizedType.substr(39, normalizedType.length() - 40));
+      if (innerTypes.size() != 1)
+         return R__FAIL(std::string("Field ") + fieldName + " has invalid cardinality template: " + normalizedType);
+      if (innerTypes[0] == "std::uint32_t") {
+         result = std::make_unique<RField<RNTupleCardinality<std::uint32_t>>>(fieldName);
+      } else if (innerTypes[0] == "std::uint64_t") {
+         result = std::make_unique<RField<RNTupleCardinality<std::uint64_t>>>(fieldName);
+      } else {
+         return R__FAIL(std::string("Field ") + fieldName + " has invalid cardinality template: " + normalizedType);
+      }
    }
 
    if (!result) {
@@ -425,6 +437,18 @@ void ROOT::Experimental::Detail::RFieldBase::Attach(
    fSubFields.emplace_back(std::move(child));
 }
 
+ROOT::Experimental::NTupleSize_t
+ROOT::Experimental::Detail::RFieldBase::EntryToColumnElementIndex(ROOT::Experimental::NTupleSize_t globalIndex) const
+{
+   std::size_t result = globalIndex;
+   for (auto f = this; f != nullptr; f = f->GetParent()) {
+      auto parent = f->GetParent();
+      if (parent && (parent->GetStructure() == kCollection || parent->GetStructure() == kVariant))
+         return 0U;
+      result *= std::max(f->GetNRepetitions(), std::size_t{1U});
+   }
+   return result;
+}
 
 std::vector<ROOT::Experimental::Detail::RFieldBase *> ROOT::Experimental::Detail::RFieldBase::GetSubFields() const
 {
@@ -535,7 +559,7 @@ void ROOT::Experimental::Detail::RFieldBase::AutoAdjustColumnTypes(const RNTuple
       SetColumnRepresentative({EColumnType::kSplitReal32});
 }
 
-void ROOT::Experimental::Detail::RFieldBase::ConnectPageSink(RPageSink &pageSink)
+void ROOT::Experimental::Detail::RFieldBase::ConnectPageSink(RPageSink &pageSink, NTupleSize_t firstEntry)
 {
    R__ASSERT(fColumns.empty());
 
@@ -544,8 +568,10 @@ void ROOT::Experimental::Detail::RFieldBase::ConnectPageSink(RPageSink &pageSink
    GenerateColumnsImpl();
    if (!fColumns.empty())
       fPrincipalColumn = fColumns[0].get();
-   for (auto& column : fColumns)
-      column->Connect(fOnDiskId, &pageSink);
+   for (auto &column : fColumns) {
+      auto firstElementIndex = (column.get() == fPrincipalColumn) ? EntryToColumnElementIndex(firstEntry) : 0;
+      column->Connect(fOnDiskId, &pageSink, firstElementIndex);
+   }
 }
 
 
@@ -673,25 +699,35 @@ void ROOT::Experimental::RField<ROOT::Experimental::ClusterSize_t>::AcceptVisito
 //------------------------------------------------------------------------------
 
 const ROOT::Experimental::Detail::RFieldBase::RColumnRepresentations &
-ROOT::Experimental::RField<ROOT::Experimental::RNTupleCardinality>::GetColumnRepresentations() const
+ROOT::Experimental::RCardinalityField::GetColumnRepresentations() const
 {
    static RColumnRepresentations representations(
-      {{EColumnType::kSplitIndex32}, {EColumnType::kIndex32}, {EColumnType::kSplitIndex64}, {EColumnType::kIndex64}},
+      {{EColumnType::kSplitIndex64}, {EColumnType::kIndex64}, {EColumnType::kSplitIndex32}, {EColumnType::kIndex32}},
       {});
    return representations;
 }
 
-void ROOT::Experimental::RField<ROOT::Experimental::RNTupleCardinality>::GenerateColumnsImpl(
-   const RNTupleDescriptor &desc)
+void ROOT::Experimental::RCardinalityField::GenerateColumnsImpl(const RNTupleDescriptor &desc)
 {
    auto onDiskTypes = EnsureCompatibleColumnTypes(desc);
    fColumns.emplace_back(Detail::RColumn::Create<ClusterSize_t>(RColumnModel(onDiskTypes[0]), 0));
 }
 
-void ROOT::Experimental::RField<ROOT::Experimental::RNTupleCardinality>::AcceptVisitor(
-   Detail::RFieldVisitor &visitor) const
+void ROOT::Experimental::RCardinalityField::AcceptVisitor(Detail::RFieldVisitor &visitor) const
 {
    visitor.VisitCardinalityField(*this);
+}
+
+const ROOT::Experimental::RField<ROOT::Experimental::RNTupleCardinality<std::uint32_t>> *
+ROOT::Experimental::RCardinalityField::As32Bit() const
+{
+   return dynamic_cast<const RField<RNTupleCardinality<std::uint32_t>> *>(this);
+}
+
+const ROOT::Experimental::RField<ROOT::Experimental::RNTupleCardinality<std::uint64_t>> *
+ROOT::Experimental::RCardinalityField::As64Bit() const
+{
+   return dynamic_cast<const RField<RNTupleCardinality<std::uint64_t>> *>(this);
 }
 
 //------------------------------------------------------------------------------
@@ -724,7 +760,7 @@ void ROOT::Experimental::RField<char>::AcceptVisitor(Detail::RFieldVisitor &visi
 const ROOT::Experimental::Detail::RFieldBase::RColumnRepresentations &
 ROOT::Experimental::RField<std::int8_t>::GetColumnRepresentations() const
 {
-   static RColumnRepresentations representations({{EColumnType::kInt8}}, {{}});
+   static RColumnRepresentations representations({{EColumnType::kInt8}}, {{EColumnType::kUInt8}});
    return representations;
 }
 
@@ -749,7 +785,7 @@ void ROOT::Experimental::RField<std::int8_t>::AcceptVisitor(Detail::RFieldVisito
 const ROOT::Experimental::Detail::RFieldBase::RColumnRepresentations &
 ROOT::Experimental::RField<std::uint8_t>::GetColumnRepresentations() const
 {
-   static RColumnRepresentations representations({{EColumnType::kInt8}}, {{}});
+   static RColumnRepresentations representations({{EColumnType::kUInt8}}, {{EColumnType::kInt8}});
    return representations;
 }
 
@@ -774,7 +810,7 @@ void ROOT::Experimental::RField<std::uint8_t>::AcceptVisitor(Detail::RFieldVisit
 const ROOT::Experimental::Detail::RFieldBase::RColumnRepresentations &
 ROOT::Experimental::RField<bool>::GetColumnRepresentations() const
 {
-   static RColumnRepresentations representations({{EColumnType::kBit}}, {{}});
+   static RColumnRepresentations representations({{EColumnType::kBit}}, {});
    return representations;
 }
 
@@ -799,7 +835,7 @@ void ROOT::Experimental::RField<bool>::AcceptVisitor(Detail::RFieldVisitor &visi
 const ROOT::Experimental::Detail::RFieldBase::RColumnRepresentations &
 ROOT::Experimental::RField<float>::GetColumnRepresentations() const
 {
-   static RColumnRepresentations representations({{EColumnType::kSplitReal32}, {EColumnType::kReal32}}, {{}});
+   static RColumnRepresentations representations({{EColumnType::kSplitReal32}, {EColumnType::kReal32}}, {});
    return representations;
 }
 
@@ -856,7 +892,8 @@ void ROOT::Experimental::RField<double>::SetDouble32()
 const ROOT::Experimental::Detail::RFieldBase::RColumnRepresentations &
 ROOT::Experimental::RField<std::int16_t>::GetColumnRepresentations() const
 {
-   static RColumnRepresentations representations({{EColumnType::kSplitInt16}, {EColumnType::kInt16}}, {{}});
+   static RColumnRepresentations representations({{EColumnType::kSplitInt16}, {EColumnType::kInt16}},
+                                                 {{EColumnType::kSplitUInt16}, {EColumnType::kUInt16}});
    return representations;
 }
 
@@ -881,7 +918,8 @@ void ROOT::Experimental::RField<std::int16_t>::AcceptVisitor(Detail::RFieldVisit
 const ROOT::Experimental::Detail::RFieldBase::RColumnRepresentations &
 ROOT::Experimental::RField<std::uint16_t>::GetColumnRepresentations() const
 {
-   static RColumnRepresentations representations({{EColumnType::kSplitInt16}, {EColumnType::kInt16}}, {{}});
+   static RColumnRepresentations representations({{EColumnType::kSplitUInt16}, {EColumnType::kUInt16}},
+                                                 {{EColumnType::kSplitInt16}, {EColumnType::kInt16}});
    return representations;
 }
 
@@ -906,7 +944,8 @@ void ROOT::Experimental::RField<std::uint16_t>::AcceptVisitor(Detail::RFieldVisi
 const ROOT::Experimental::Detail::RFieldBase::RColumnRepresentations &
 ROOT::Experimental::RField<std::int32_t>::GetColumnRepresentations() const
 {
-   static RColumnRepresentations representations({{EColumnType::kSplitInt32}, {EColumnType::kInt32}}, {{}});
+   static RColumnRepresentations representations({{EColumnType::kSplitInt32}, {EColumnType::kInt32}},
+                                                 {{EColumnType::kSplitUInt32}, {EColumnType::kUInt32}});
    return representations;
 }
 
@@ -931,7 +970,8 @@ void ROOT::Experimental::RField<std::int32_t>::AcceptVisitor(Detail::RFieldVisit
 const ROOT::Experimental::Detail::RFieldBase::RColumnRepresentations &
 ROOT::Experimental::RField<std::uint32_t>::GetColumnRepresentations() const
 {
-   static RColumnRepresentations representations({{EColumnType::kSplitInt32}, {EColumnType::kInt32}}, {{}});
+   static RColumnRepresentations representations({{EColumnType::kSplitUInt32}, {EColumnType::kUInt32}},
+                                                 {{EColumnType::kSplitInt32}, {EColumnType::kInt32}});
    return representations;
 }
 
@@ -956,7 +996,8 @@ void ROOT::Experimental::RField<std::uint32_t>::AcceptVisitor(Detail::RFieldVisi
 const ROOT::Experimental::Detail::RFieldBase::RColumnRepresentations &
 ROOT::Experimental::RField<std::uint64_t>::GetColumnRepresentations() const
 {
-   static RColumnRepresentations representations({{EColumnType::kSplitInt64}, {EColumnType::kInt64}}, {{}});
+   static RColumnRepresentations representations({{EColumnType::kSplitUInt64}, {EColumnType::kUInt64}},
+                                                 {{EColumnType::kSplitInt64}, {EColumnType::kInt64}});
    return representations;
 }
 
@@ -982,7 +1023,12 @@ const ROOT::Experimental::Detail::RFieldBase::RColumnRepresentations &
 ROOT::Experimental::RField<std::int64_t>::GetColumnRepresentations() const
 {
    static RColumnRepresentations representations({{EColumnType::kSplitInt64}, {EColumnType::kInt64}},
-                                                 {{EColumnType::kInt32}, {EColumnType::kSplitInt32}});
+                                                 {{EColumnType::kSplitUInt64},
+                                                  {EColumnType::kUInt64},
+                                                  {EColumnType::kInt32},
+                                                  {EColumnType::kSplitInt32},
+                                                  {EColumnType::kUInt32},
+                                                  {EColumnType::kSplitUInt32}});
    return representations;
 }
 
@@ -2284,10 +2330,14 @@ void ROOT::Experimental::RVariantField::ReadGlobalImpl(NTupleSize_t globalIndex,
    RClusterIndex variantIndex;
    std::uint32_t tag;
    fPrincipalColumn->GetSwitchInfo(globalIndex, &variantIndex, &tag);
-   R__ASSERT(tag > 0); // TODO(jblomer): deal with invalid variants
 
-   auto itemValue = fSubFields[tag - 1]->GenerateValue(value->GetRawPtr());
-   fSubFields[tag - 1]->Read(variantIndex, &itemValue);
+   // If `tag` equals 0, the variant is in the invalid state, i.e, it does not hold any of the valid alternatives in
+   // the type list.  This happens, e.g., if the field was late added; in this case, keep the invalid tag, which makes
+   // any `std::holds_alternative<T>` check fail later.
+   if (R__likely(tag > 0)) {
+      auto itemValue = fSubFields[tag - 1]->GenerateValue(value->GetRawPtr());
+      fSubFields[tag - 1]->Read(variantIndex, &itemValue);
+   }
    SetTag(value->GetRawPtr(), tag);
 }
 

@@ -144,7 +144,7 @@ BuildAction(const ColumnNames_t &bl, const std::shared_ptr<::TH1D> &h, const uns
 {
    auto hasAxisLimits = HistoUtils<::TH1D>::HasAxisLimits(*h);
 
-   if (hasAxisLimits) {
+   if (hasAxisLimits || !IsImplicitMTEnabled()) {
       using Helper_t = FillHelper<::TH1D>;
       using Action_t = RAction<Helper_t, PrevNodeType, TTraits::TypeList<ColTypes...>>;
       return std::make_unique<Action_t>(Helper_t(h, nSlots), bl, std::move(prevNode), colRegister);
@@ -270,7 +270,7 @@ BuildAction(const ColumnNames_t &colNames, const std::shared_ptr<SnapshotHelperA
       std::vector<bool> isDef;
       isDef.reserve(sizeof...(ColTypes));
       for (auto i = 0u; i < sizeof...(ColTypes); ++i)
-         isDef[i] = colRegister.IsDefineOrAlias(colNames[i]);
+         isDef.push_back(colRegister.IsDefineOrAlias(colNames[i]));
       return isDef;
    };
    std::vector<bool> isDefine = makeIsDefine();

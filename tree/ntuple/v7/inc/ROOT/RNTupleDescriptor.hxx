@@ -1,6 +1,7 @@
 /// \file ROOT/RNTupleDescriptor.hxx
 /// \ingroup NTuple ROOT7
 /// \author Jakob Blomer <jblomer@cern.ch>
+/// \author Javier Lopez-Gomez <javier.lopez.gomez@cern.ch>
 /// \date 2018-07-19
 /// \warning This is part of the ROOT 7 prototype! It will change without notice. It might trigger earthquakes. Feedback
 /// is welcome!
@@ -44,7 +45,8 @@ class RNTupleDescriptorBuilder;
 class RNTupleModel;
 
 namespace Detail {
-   class RFieldBase;
+class RColumnElementBase;
+class RFieldBase;
 }
 
 
@@ -133,6 +135,9 @@ private:
    DescriptorId_t fFieldId = kInvalidDescriptorId;
    /// A field can be serialized into several columns, which are numbered from zero to $n$
    std::uint32_t fIndex;
+   /// Specifies the index for the first stored element for this column. For deferred columns the value is greater
+   /// than 0
+   std::uint64_t fFirstElementIndex = 0U;
 
 public:
    RColumnDescriptor() = default;
@@ -151,6 +156,8 @@ public:
    std::uint32_t GetIndex() const { return fIndex; }
    DescriptorId_t GetFieldId() const { return fFieldId; }
    bool IsAliasColumn() const { return fPhysicalColumnId != fLogicalColumnId; }
+   std::uint64_t GetFirstElementIndex() const { return fFirstElementIndex; }
+   bool IsDeferredColumn() const { return fFirstElementIndex > 0; }
 };
 
 // clang-format off
@@ -276,6 +283,14 @@ public:
       bool operator==(const RPageRange &other) const {
          return fPhysicalColumnId == other.fPhysicalColumnId && fPageInfos == other.fPageInfos;
       }
+
+      /// Extend this RPageRange to fit the given RColumnRange, i.e. prepend as many synthetic RPageInfos as needed to
+      /// cover the range in `columnRange`. `RPageInfo`s are constructed to contain as many elements of type `element`
+      /// given a page size limit of `pageSize` (in bytes); the locator for the referenced pages is `kTypePageZero`.
+      /// This function is used to make up `RPageRange`s for clusters that contain deferred columns.
+      /// \return The number of column elements covered by the synthesized RPageInfos
+      std::size_t ExtendToFitColumnRange(const RColumnRange &columnRange, const Detail::RColumnElementBase &element,
+                                         std::size_t pageSize);
    };
 
 private:
@@ -819,6 +834,11 @@ public:
       fColumn.fIndex = index;
       return *this;
    }
+   RColumnDescriptorBuilder &FirstElementIndex(std::uint64_t firstElementIdx)
+   {
+      fColumn.fFirstElementIndex = firstElementIdx;
+      return *this;
+   }
    DescriptorId_t GetFieldId() const { return fColumn.fFieldId; }
    /// Attempt to make a column descriptor. This may fail if the column
    /// was not given enough information to make a proper descriptor.
@@ -932,6 +952,11 @@ public:
    RResult<void> CommitColumnRange(DescriptorId_t physicalId, std::uint64_t firstElementIndex,
                                    std::uint32_t compressionSettings, const RClusterDescriptor::RPageRange &pageRange);
 
+   /// Add column and page ranges for deferred columns missing in this cluster.  The locator type for the synthesized
+   /// page ranges is `kTypePageZero`.  All the page sources must be able to populate the 'zero' page from such locator.
+   /// Any call to `CommitColumnRange()` should happen before calling this function.
+   RClusterDescriptorBuilder &AddDeferredColumnRanges(const RNTupleDescriptor &desc);
+
    /// Move out the full cluster descriptor including page locations
    RResult<RClusterDescriptor> MoveDescriptor();
 };
@@ -1035,7 +1060,7 @@ public:
    RResult<void> AddFieldLink(DescriptorId_t fieldId, DescriptorId_t linkId);
 
    void AddColumn(DescriptorId_t logicalId, DescriptorId_t physicalId, DescriptorId_t fieldId,
-                  const RColumnModel &model, std::uint32_t index);
+                  const RColumnModel &model, std::uint32_t index, std::uint64_t firstElementIdx = 0U);
    RResult<void> AddColumn(RColumnDescriptor &&columnDesc);
 
    RResult<void> AddClusterSummary(DescriptorId_t clusterId, std::uint64_t firstEntry, std::uint64_t nEntries);
