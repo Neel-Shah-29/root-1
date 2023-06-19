@@ -64,10 +64,11 @@ private:
       RColumnBuf& operator=(const RColumnBuf&) = delete;
       RColumnBuf(RColumnBuf&&) = default;
       RColumnBuf& operator=(RColumnBuf&&) = default;
-      ~RColumnBuf() = default;
+      ~RColumnBuf() { DropBufferedPages(); }
 
       /// Returns a reference to the newly buffered page. The reference remains
       /// valid until the return value of DrainBufferedPages() is destroyed.
+      /// Note that `BufferPage()` yields the ownership of `page` to RColumnBuf.
       RPageZipItem &BufferPage(
          RPageStorage::ColumnHandle_t columnHandle, const RPage &page)
       {
@@ -85,8 +86,10 @@ private:
       const RPageStorage::SealedPageSequence_t &GetSealedPages() const { return fSealedPages; }
 
       using BufferedPages_t = std::tuple<std::deque<RPageZipItem>, RPageStorage::SealedPageSequence_t>;
-      // When the return value of DrainBufferedPages() is destroyed, all references
-      // returned by GetBuffer are invalidated.
+      /// When the return value of DrainBufferedPages() is destroyed, all references
+      /// returned by GetBuffer are invalidated.
+      /// This function gives up on the ownership of the buffered pages.  Thus, `ReleasePage()` must be called
+      /// accordingly.
       BufferedPages_t DrainBufferedPages()
       {
          BufferedPages_t drained;
@@ -94,6 +97,7 @@ private:
          std::swap(fSealedPages, std::get<decltype(fSealedPages)>(drained));
          return drained;
       }
+      void DropBufferedPages();
 
       // The returned reference points to a default-constructed RSealedPage. It can be used
       // to fill in data after sealing.
@@ -104,11 +108,13 @@ private:
 
    private:
       RPageStorage::ColumnHandle_t fCol;
-      // Using a deque guarantees that element iterators are never invalidated
-      // by appends to the end of the iterator by BufferPage.
+      /// Using a deque guarantees that element iterators are never invalidated
+      /// by appends to the end of the iterator by BufferPage.
       std::deque<RPageZipItem> fBufferedPages;
-      // Pages that have been already sealed by a concurrent task. A vector commit can be issued if all
-      // buffered pages have been sealed.
+      /// Pages that have been already sealed by a concurrent task. A vector commit can be issued if all
+      /// buffered pages have been sealed.
+      /// Note that each RSealedPage refers to the same buffer as `fBufferedPages[i].fBuf` for some value of `i`, and
+      /// thus owned by RPageZipItem
       RPageStorage::SealedPageSequence_t fSealedPages;
    };
 

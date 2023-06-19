@@ -14,6 +14,8 @@
 #ifndef RooFit_Detail_EvaluateFuncs_h
 #define RooFit_Detail_EvaluateFuncs_h
 
+#include <TMath.h>
+
 #include <cmath>
 
 namespace RooFit {
@@ -72,6 +74,27 @@ inline double constraintSumEvaluate(double const *comp, unsigned int compSize)
       sum -= std::log(comp[i]);
    }
    return sum;
+}
+
+inline unsigned int getUniformBinning(double low, double high, double val, unsigned int numBins)
+{
+   double binWidth = (high - low) / numBins;
+   return val >= high ? numBins - 1 : std::abs((val - low) / binWidth);
+}
+
+inline double poissonEvaluate(double x, double par)
+{
+   if (par < 0)
+      return TMath::QuietNaN();
+
+   if (x < 0)
+      return 0;
+   else if (x == 0.0)
+      return std::exp(-par);
+   else {
+      double out = x * std::log(par) - TMath::LnGamma(x + 1.) - par;
+      return std::exp(out);
+   }
 }
 
 } // namespace EvaluateFuncs

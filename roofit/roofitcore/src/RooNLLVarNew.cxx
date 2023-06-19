@@ -26,6 +26,7 @@ functions from `RooBatchCompute` library to provide faster computation times.
 
 #include <RooBatchCompute.h>
 #include <RooNaNPacker.h>
+#include <RooConstVar.h>
 #include <RooRealVar.h>
 #include "RooFit/Detail/Buffers.h"
 
@@ -54,9 +55,10 @@ RooArgSet getObs(RooAbsArg const &arg, RooArgSet const &observables)
    return out;
 }
 
-RooRealVar *dummyVar(const char *name)
+// Use RooConstVar for dummies such that they don't get included in getParameters().
+RooConstVar *dummyVar(const char *name)
 {
-   return new RooRealVar(name, name, 1.0);
+   return new RooConstVar(name, name, 1.0);
 }
 
 } // namespace
@@ -79,7 +81,10 @@ RooNLLVarNew::RooNLLVarNew(const char *name, const char *title, RooAbsPdf &pdf, 
 {
    RooArgSet obs{getObs(pdf, observables)};
 
-   if (_binnedL) {
+   // In the "BinnedLikelihoodActiveYields" mode, the pdf values can directly
+   // be interpreted as yields and don't need to be multiplied by the bin
+   // widths. That's why we don't need to even fill them in this case.
+   if (_binnedL && !pdf.getAttribute("BinnedLikelihoodActiveYields")) {
       fillBinWidthsFromPdfBoundaries(pdf, obs);
    }
 
@@ -145,13 +150,18 @@ double RooNLLVarNew::computeBatchBinnedL(RooSpan<const double> preds, RooSpan<co
    ROOT::Math::KahanSum<double> result{0.0};
    ROOT::Math::KahanSum<double> sumWeightKahanSum{0.0};
 
+   const bool predsAreYields = _binw.empty();
+
    for (std::size_t i = 0; i < preds.size(); ++i) {
 
       double eventWeight = weights[i];
 
       // Calculate log(Poisson(N|mu) for this bin
       double N = eventWeight;
-      double mu = preds[i] * _binw[i];
+      double mu = preds[i];
+      if (!predsAreYields) {
+         mu *= _binw[i];
+      }
 
       if (mu <= 0 && N > 0) {
 
@@ -309,8 +319,24 @@ void RooNLLVarNew::translate(RooFit::Detail::CodeSquashContext &ctx) const
    // brackets of the loop is written at the end of the scopes lifetime.
    {
       auto scope = ctx.beginLoop(this);
-      ctx.addToCodeBody(this, resName + " -= " + ctx.getResult(_weightVar.arg()) + " * std::log(" +
-                                 ctx.getResult(_pdf.arg()) + ");\n");
+      std::string const &weight = ctx.getResult(_weightVar.arg());
+      std::string const &pdfName = ctx.getResult(_pdf.arg());
+
+      if (_binnedL) {
+         // Since we only support uniform binning, bin width is the same for all.
+         if (!_pdf->getAttribute("BinnedLikelihoodActiveYields")) {
+            std::stringstream errorMsg;
+            errorMsg << "RooNLLVarNew::translate(): binned likelihood optimization is only supported when raw pdf "
+                        "values can be interpreted as yields."
+                     << " This is not the case for HistFactory models written with ROOT versions before 6.26.00";
+            coutE(InputArguments) << errorMsg.str() << std::endl;
+         }
+         std::string muName = pdfName;
+         ctx.addToCodeBody(this, resName + " +=  -1 * (-" + muName + " + " + weight + " * std::log(" + muName +
+                                    ") - TMath::LnGamma(" + weight + "+ 1));\n");
+      } else {
+         ctx.addToCodeBody(this, resName + " -= " + weight + " * std::log(" + pdfName + ");\n");
+      }
    }
    if (_expectedEvents) {
       std::string expected = ctx.getResult(**_expectedEvents);
