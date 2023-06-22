@@ -516,7 +516,7 @@ TEST(ONNX, Log)
 
    // Preparing the random input
    std::vector<float> input({
-     0.0000, 0.6931, 1.0986, 1.3863
+     1, 2, 3, 4
    });
 
    TMVA_SOFIE_Log::Session s("Log_FromONNX.dat");

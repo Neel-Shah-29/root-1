@@ -20,6 +20,7 @@ extern ParserFuncSignature ParseSqrt;
 extern ParserFuncSignature ParseReciprocal;
 extern ParserFuncSignature ParseNeg;
 extern ParserFuncSignature ParseExp;
+extern ParserFuncSignature ParseLog;
 // Binary operators
 extern ParserFuncSignature ParseAdd;
 extern ParserFuncSignature ParseSub;
@@ -61,7 +62,6 @@ extern ParserFuncSignature ParseShape;
 extern ParserFuncSignature ParseMatMul;
 extern ParserFuncSignature ParseLayerNormalization;
 extern ParserFuncSignature ParseGather;
-extern ParserFuncSignature ParseLog;
 // Decalaration of fused operators
 extern ParserFuseFuncSignature ParseFuseConvAdd;
 extern ParserFuseFuncSignature ParseFuseConvTransposeAdd;
@@ -81,6 +81,7 @@ RModelParser_ONNX::RModelParser_ONNX() noexcept : fOperatorsMapImpl(std::make_un
    RegisterOperator("Reciprocal", ParseReciprocal);
    RegisterOperator("Neg", ParseNeg);
    RegisterOperator("Exp", ParseExp);
+   RegisterOperator("Log", ParseLog);
    // Binary operators
    RegisterOperator("Add", ParseAdd);
    RegisterOperator("Sub", ParseSub);
@@ -129,7 +130,6 @@ RModelParser_ONNX::RModelParser_ONNX() noexcept : fOperatorsMapImpl(std::make_un
    RegisterOperator("LayerNormalization", ParseLayerNormalization);
    RegisterOperator("Expand", ParseExpand);
    RegisterOperator("Gather", ParseGather);
-   RegisterOperator("Log", ParseLog);
 }
 
 // Destructor of the parser
