@@ -45,6 +45,11 @@ struct InputTensorInfo{
    std::vector<Dim> shape;
 };
 
+struct DynamicTensorInfo{
+   ETensorType type;
+   std::vector<Dim> shape;
+};
+
 struct TensorInfo{
    ETensorType type;
    std::vector<size_t> shape;

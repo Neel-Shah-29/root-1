@@ -36,6 +36,7 @@ private:
    std::unordered_map<std::string, TensorInfo> fReadyInputTensorInfos;
    std::unordered_map<std::string, InitializedTensor> fInitializedTensors;
    std::unordered_map<std::string, TensorInfo> fIntermediateTensorInfos;
+   std::unordered_map<std::string, DynamicTensorInfo> fDynamicIntermediateTensorInfos;
    std::vector<std::string> fOutputTensorNames;
    std::vector<std::string> fInputTensorNames;  //input tensor names using ONNX order
 
@@ -80,6 +81,7 @@ public:
    // Check if a tensor is initialized
    bool IsInitializedTensor(const std::string& name) const;
    void AddIntermediateTensor(std::string tensor_name, ETensorType type, std::vector<std::size_t> shape);
+   void AddDynamicIntermediateTensor(std::string tensor_name, ETensorType type, std::vector<std::size_t> shape);
    void AddBlasRoutines(std::vector<std::string> routines) {
       for (auto &routine : routines) {
          fNeededBlasRoutines.insert(routine);

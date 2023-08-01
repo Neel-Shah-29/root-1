@@ -102,6 +102,7 @@ namespace SOFIE{
       if (fReadyInputTensorInfos.find(tensor_name) != fReadyInputTensorInfos.end())  return true;
       if (fInitializedTensors.find(tensor_name) != fInitializedTensors.end()) return true;
       if (fIntermediateTensorInfos.find(tensor_name) != fIntermediateTensorInfos.end()) return true;
+      if(fDynamicIntermediateTensorInfos.find(tensor_name) != fDynamicIntermediateTensorInfos.end()) return true;
       return false;
    }
 
@@ -164,6 +165,15 @@ namespace SOFIE{
       }
       TensorInfo new_tensor {type, shape};
       fIntermediateTensorInfos[tensor_name] = new_tensor;
+   }
+
+      void RModel::AddDynamicIntermediateTensor(std::string tensor_name, ETensorType type, std::vector<std::size_t> shape){
+      tensor_name = UTILITY::Clean_name(tensor_name);
+      if (CheckIfTensorAlreadyExist(tensor_name)){
+         throw std::runtime_error("TMVA-SOFIE: intermediate tensor with name " + tensor_name + " already exists \n");
+      }
+      DynamicTensorInfo new_tensor {type, {-1}}; //shape is not known yet
+      fDynamicIntermediateTensorInfos[tensor_name] = new_tensor;
    }
 
    void RModel::AddOutputTensorNameList(std::vector<std::string> outputtensornames){
