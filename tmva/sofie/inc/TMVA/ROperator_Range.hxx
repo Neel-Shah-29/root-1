@@ -56,6 +56,8 @@ public:
          throw std::runtime_error("TMVA SOFIE Range operator called to Generate without being initialized first");
       }
       std::stringstream out;
+      //Getting the length of the dynamic output tensor
+      
       size_t length = ConvertShapeToLength(fShapeY);
       out << "\n//------ Range\n";
       out << SP << "for (int id = 0; id < " << length << " ; id++){\n";
