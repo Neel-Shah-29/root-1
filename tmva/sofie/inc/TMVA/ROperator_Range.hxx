@@ -46,22 +46,29 @@ public:
       // double delta = std::stod(fNDelta);
       // num_of_elem = std::max(std::ceil((lim - start) / delta), 0.0);
       // fShapeY = {num_of_elem};
-      model.AddDynamicIntermediateTensor(fNY, ETensorType::DOUBLE, {-1});
+      size_t DYNAMIC_VALUE = (size_t) (-1);
+      model.AddDynamicIntermediateTensor(fNY, ETensorType::DOUBLE, {DYNAMIC_VALUE});
    }
 
    std::string Generate(std::string OpName)
    {
       OpName = "op_" + OpName;
-      if (fShapeY.empty()) {
-         throw std::runtime_error("TMVA SOFIE Range operator called to Generate without being initialized first");
-      }
+      // if (fShapeY.empty()) {
+      //    throw std::runtime_error("TMVA SOFIE Range operator called to Generate without being initialized first");
+      // }
       std::stringstream out;
       //Getting the length of the dynamic output tensor
       
-      size_t length = ConvertShapeToLength(fShapeY);
+      
       out << "\n//------ Range\n";
-      out << SP << "for (int id = 0; id < " << length << " ; id++){\n";
-      out << SP << SP << "tensor_" << fNY << "[id] = " << fNStart << " + (id * " << fNDelta << ");\n";
+      out << SP << "double start = tensor_" << fNStart << "[0] = \n";
+      out << SP << "double limit = tensor_" << fNLimit << "[0] = \n";
+      out << SP << "double delta = tensor_" << fNDelta << "[0] = \n";
+      out << SP << "int num_of_elem = std::max(std::ceil((limit - start) / delta), 0.0);\n";
+      // out << SP << "std::vector<size_t> " << fShapeY << " = {num_of_elem};\n";
+      out << SP << "size_t length = num_of_elem;\n";
+      out << SP << "for (int id = 0; id < length ; id++){\n";
+      out << SP << SP << "tensor_" << fNY << "[id] = tensor_" << fNStart << "[0] + (id * tensor_" << fNDelta << "[0] );\n";
       out << SP << "}\n";
       return out.str();
    }

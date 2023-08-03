@@ -168,11 +168,12 @@ namespace SOFIE{
    }
 
       void RModel::AddDynamicIntermediateTensor(std::string tensor_name, ETensorType type, std::vector<std::size_t> shape){
+      size_t DYNAMIC_VALUE = (size_t) (-1);
       tensor_name = UTILITY::Clean_name(tensor_name);
       if (CheckIfTensorAlreadyExist(tensor_name)){
          throw std::runtime_error("TMVA-SOFIE: intermediate tensor with name " + tensor_name + " already exists \n");
       }
-      DynamicTensorInfo new_tensor {type, {-1}}; //shape is not known yet
+      DynamicTensorInfo new_tensor {type, {DYNAMIC_VALUE}}; //shape is not known yet
       fDynamicIntermediateTensorInfos[tensor_name] = new_tensor;
    }
 
