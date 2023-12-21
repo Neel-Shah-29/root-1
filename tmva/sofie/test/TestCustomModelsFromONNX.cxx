@@ -275,11 +275,11 @@
 #include "Greater_FromONNX.hxx"
 #include "input_models/references/Greater.ref.hxx"
 
-// #include "ConstantOfShape_FromONNX.hxx"
-// #include "input_models/references/ConstantOfShape.onnx"
+#include "ConstantOfShape_FromONNX.hxx"
+#include "input_models/references/ConstantOfShape.onnx"
 
-// #include "Constant_FromONNX.hxx"
-// #include "input_models/references/Constant.onnx"
+#include "Constant_FromONNX.hxx"
+#include "input_models/references/Constant.onnx"
 
 #include "Split_FromONNX.hxx"
 #include "input_models/references/Split.onnx"
@@ -526,54 +526,54 @@ TEST(ONNX, Cast)
    }
 }
 
-// TEST(ONNX, Constant)
-// {
-//    constexpr float TOLERANCE = DEFAULT_TOLERANCE;
+TEST(ONNX, Constant)
+{
+   constexpr float TOLERANCE = DEFAULT_TOLERANCE;
 
-//    // Preparing the standard  input
-//    // std::vector<float> input({
-//    //    1,2,3,4
-//    // });
+   // Preparing the standard  input
+   // std::vector<float> input({
+   //    1,2,3,4
+   // });
 
-//    TMVA_SOFIE_Constant::Session s("Constant_FromONNX.dat");
+   TMVA_SOFIE_Constant::Session s("Constant_FromONNX.dat");
 
-//    auto output = s.infer();
+   auto output = s.infer();
 
-//    // Checking output size
-//    EXPECT_EQ(output.size(), sizeof(Constant_ExpectedOutput::outputs) / sizeof(float));
+   // Checking output size
+   EXPECT_EQ(output.size(), sizeof(Constant_ExpectedOutput::outputs) / sizeof(float));
 
-//    float *correct = Constant_ExpectedOutput::outputs;
+   float *correct = Constant_ExpectedOutput::outputs;
 
-//    // Checking every output value, one by one
-//    for (size_t i = 0; i < output.size(); ++i) {
-//       EXPECT_LE(std::abs(output[i] - correct[i]), TOLERANCE);
-//    }
-// }
+   // Checking every output value, one by one
+   for (size_t i = 0; i < output.size(); ++i) {
+      EXPECT_LE(std::abs(output[i] - correct[i]), TOLERANCE);
+   }
+}
 
 
-// TEST(ONNX, ConstantOfShape)
-// {
-//    constexpr float TOLERANCE = DEFAULT_TOLERANCE;
+TEST(ONNX, ConstantOfShape)
+{
+   constexpr float TOLERANCE = DEFAULT_TOLERANCE;
 
-//    // Preparing the standard  input
-//    std::vector<float> input({
-//       1,2,3
-//    });
+   // Preparing the standard  input
+   std::vector<float> input({
+      1,2,3
+   });
 
-//    TMVA_SOFIE_ConstantOfShape::Session s("ConstantOfShape_FromONNX.dat");
+   TMVA_SOFIE_ConstantOfShape::Session s("ConstantOfShape_FromONNX.dat");
 
-//    auto output = s.infer(input.data());
+   auto output = s.infer(input.data());
 
-//    // Checking output size
-//    EXPECT_EQ(output.size(), sizeof(ConstantOfShape_ExpectedOutput::outputs) / sizeof(float));
+   // Checking output size
+   EXPECT_EQ(output.size(), sizeof(ConstantOfShape_ExpectedOutput::outputs) / sizeof(float));
 
-//    float *correct = ConstantOfShape_ExpectedOutput::outputs;
+   float *correct = ConstantOfShape_ExpectedOutput::outputs;
 
-//    // Checking every output value, one by one
-//    for (size_t i = 0; i < output.size(); ++i) {
-//       EXPECT_LE(std::abs(output[i] - correct[i]), TOLERANCE);
-//    }
-// }
+   // Checking every output value, one by one
+   for (size_t i = 0; i < output.size(); ++i) {
+      EXPECT_LE(std::abs(output[i] - correct[i]), TOLERANCE);
+   }
+}
 
 TEST(ONNX, Split)
 {
