@@ -588,7 +588,7 @@ TEST(ONNX, Split)
    });
    TMVA_SOFIE_Split::Session s("Split_FromONNX.dat");
 
-   auto output = s.infer(input.data());
+   auto output = s.infer(input.data(), values.data());
 
    // Checking output size
    for(int i=0;i<output.size();i++){
